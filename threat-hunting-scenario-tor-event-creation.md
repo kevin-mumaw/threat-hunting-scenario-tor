@@ -39,37 +39,37 @@
 
 ## Related Queries:
 ```kql
-// Installer name == tor-browser-windows-x86_64-portable-(version).exe
-// Detect the installer being downloaded
+//Check DeviceFileEvents for any tor(.exe) or firefox(.exe) file events
 DeviceFileEvents
-| where FileName startswith "tor"
-
-// TOR Browser being silently installed
-// Take note of two spaces before the /S (I don't know why)
-DeviceProcessEvents
-| where ProcessCommandLine contains "tor-browser-windows-x86_64-portable-14.0.1.exe  /S"
-| project Timestamp, DeviceName, ActionType, FileName, ProcessCommandLine
-
-// TOR Browser or service was successfully installed and is present on the disk
-DeviceFileEvents
-| where FileName has_any ("tor.exe", "firefox.exe")
-| project  Timestamp, DeviceName, RequestAccountName, ActionType, InitiatingProcessCommandLine
-
-// TOR Browser or service was launched
-DeviceProcessEvents
-| where ProcessCommandLine has_any("tor.exe","firefox.exe")
-| project  Timestamp, DeviceName, AccountName, ActionType, ProcessCommandLine
-
-// TOR Browser or service is being used and is actively creating network connections
-DeviceNetworkEvents
-| where InitiatingProcessFileName in~ ("tor.exe", "firefox.exe")
-| where RemotePort in (9001, 9030, 9040, 9050, 9051, 9150)
-| project Timestamp, DeviceName, InitiatingProcessAccountName, InitiatingProcessFileName, RemoteIP, RemotePort, RemoteUrl
+| where DeviceName == "kem-threat-hunt"
+| where InitiatingProcessAccountName == "labuser"
+| where FileName contains "tor"
 | order by Timestamp desc
+| project Timestamp, DeviceName, FileName, ActionType, FolderPath, SHA256, Account = InitiatingProcessAccountName
 
-// User shopping list was created and, changed, or deleted
-DeviceFileEvents
-| where FileName contains "shopping-list.txt"
+//Check DeviceProcessEvents for any signs of installation or usage of the Tor browser
+DeviceProcessEvents
+| where DeviceName == "kem-threat-hunt"
+| where ProcessCommandLine contains "tor-browser-windows-x86_64-portable-14.5.3.exe"
+| project Timestamp, DeviceName, ActionType, InitiatingProcessFileName, FolderPath, ProcessCommandLine, SHA256
+
+// Filters DeviceNetworkEvents for a specific device named "kem-threat-hunt," 
+//focusing on connections to specific ports associated with Tor
+DeviceNetworkEvents
+| where DeviceName == "kem-threat-hunt"
+//| where InitiatingProcessAccountName != "system"
+//| where ActionType == "ConnectionSuccess" 
+| where RemotePort in ("9001", "9030", "9050", "9051", "9150") //Tor operates over port 9050 or 9150. Tor network operates over 9001 and 443
+| project Timestamp, DeviceName, InitiatingProcessAccountName, ActionType, RemotePort, RemoteIP, InitiatingProcessFileName, InitiatingProcessFolderPath
+| order by Timestamp desc 
+
+//This KQL query filters device process events for the device named "kem-threat-hunt" 
+//to identify processes involving "tor.exe," "firefox.exe," or "tor-browser.exe" 
+DeviceProcessEvents
+| where DeviceName == "kem-threat-hunt"
+| where FileName has_any ("tor.exe", "firefox.exe", "tor-browser.exe")
+| project Timestamp, DeviceName, AccountName, ActionType, FileName, FolderPath, SHA256, ProcessCommandLine
+| order by Timestamp desc 
 ```
 
 ---
